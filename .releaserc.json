@@ -1,0 +1,14 @@
+{
+  "branches": ["main"],
+  "plugins": [
+    "@semantic-release/commit-analyzer",
+    "@semantic-release/release-notes-generator",
+    ["@semantic-release/exec", {
+      "prepareCmd": "echo \"export const VERSION = '${nextRelease.version}';\" > version.ts"
+    }],
+    ["@semantic-release/git", {
+      "assets": ["version.ts"]
+    }],
+    ["@semantic-release/github"]
+  ]
+}

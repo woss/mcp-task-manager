@@ -1,0 +1,30 @@
+{
+  "name": "task-manager",
+  "version": "0.0.0",
+  "author": "daniel maricic <daniel@woss.io>",
+  "license": "MIT",
+  "exports": "./main.ts",
+  "main": "main.ts",
+  "fmt": {
+    "exclude": [".opencode"]
+  },
+  "lint": {
+    "exclude": [".opencode"],
+    "rules": {
+      "exclude": ["require-await"]
+    }
+  },
+  "tasks": {
+    "compile": "deno compile --allow-read --allow-write --allow-env --allow-ffi --output task-manager main.ts",
+    "compile-all": "deno compile --allow-read --allow-write --allow-env --allow-ffi --output task-manager-x86_64-linux --target x86_64-unknown-linux-gnu main.ts && deno compile --allow-read --allow-write --allow-env --allow-ffi --output task-manager-x86_64-macos --target x86_64-apple-darwin main.ts && deno compile --allow-read --allow-write --allow-env --allow-ffi --output task-manager-aarch64-macos --target aarch64-apple-darwin main.ts && deno compile --allow-read --allow-write --allow-env --allow-ffi --output task-manager-aarch64-linux --target aarch64-unknown-linux-gnu main.ts",
+    "start": "deno run --allow-read --allow-write --allow-env --allow-ffi main.ts",
+    "check": "deno check main.ts"
+  },
+  "imports": {
+    "@db/sqlite": "jsr:@db/sqlite@0.13",
+    "@logtape/file": "jsr:@logtape/file",
+    "@logtape/logtape": "jsr:@logtape/logtape",
+    "@modelcontextprotocol/sdk": "npm:@modelcontextprotocol/sdk@^1.9.0",
+    "zod": "npm:zod"
+  }
+}

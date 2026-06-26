@@ -1,0 +1,19 @@
+# Compiled binary
+task-manager
+task-manager-*-linux
+task-manager-*-macos
+
+# Database & logs (project-local, user-configurable)
+data/
+logs/
+
+# Deno
+deno.lock
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/settings.json
+.idea/

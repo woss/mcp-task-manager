@@ -1,0 +1,94 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Semantic Release
+        id: semantic
+        uses: cycjimmy/semantic-release-action@v6
+        with:
+          extra_plugins: |
+            @semantic-release/exec
+            @semantic-release/git
+            @semantic-release/github
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build binaries
+        if: steps.semantic.outputs.new_release_published == 'true'
+        run: |
+          tag="v${{ steps.semantic.outputs.new_release_version }}"
+          git checkout "$tag"
+          # Linux x86_64
+          deno compile --allow-read --allow-write --allow-env --allow-ffi --output task-manager --target x86_64-unknown-linux-gnu main.ts
+          tar czf task-manager-x86_64-linux.tar.gz task-manager && rm task-manager
+          # Linux ARM64
+          deno compile --allow-read --allow-write --allow-env --allow-ffi --output task-manager --target aarch64-unknown-linux-gnu main.ts
+          tar czf task-manager-aarch64-linux.tar.gz task-manager && rm task-manager
+          # macOS ARM64
+          deno compile --allow-read --allow-write --allow-env --allow-ffi --output task-manager --target aarch64-apple-darwin main.ts
+          tar czf task-manager-aarch64-macos.tar.gz task-manager && rm task-manager
+          # macOS x86_64
+          deno compile --allow-read --allow-write --allow-env --allow-ffi --output task-manager --target x86_64-apple-darwin main.ts
+          tar czf task-manager-x86_64-macos.tar.gz task-manager && rm task-manager
+
+      - name: Upload binaries to release
+        if: steps.semantic.outputs.new_release_published == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="v${{ steps.semantic.outputs.new_release_version }}"
+          gh release upload "$tag" task-manager-*.tar.gz
+
+      - name: Update Homebrew formula
+        if: steps.semantic.outputs.new_release_published == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          TAG="v${{ steps.semantic.outputs.new_release_version }}"
+          VERSION="${{ steps.semantic.outputs.new_release_version }}"
+
+          git clone https://x-access-token:${GH_TOKEN}@github.com/woss/homebrew-tap.git /tmp/homebrew-tap
+          cd /tmp/homebrew-tap
+
+          # Update version line
+          sed -i 's/version "[0-9.]*"/version "'"${VERSION}"'"/' Formula/task-manager.rb
+
+          # Update all URL tags (vX.Y.Z → vNEW in download paths)
+          sed -i "s|/releases/download/v[0-9.]*/|/releases/download/${TAG}/|" Formula/task-manager.rb
+
+          # For each platform asset, compute SHA and replace
+          for asset in \
+            task-manager-aarch64-macos.tar.gz task-manager-x86_64-macos.tar.gz \
+            task-manager-aarch64-linux.tar.gz task-manager-x86_64-linux.tar.gz
+          do
+            gh release download "$TAG" \
+              --repo woss/mcp-task-manager \
+              --pattern "$asset" \
+              --dir /tmp
+            new_sha=$(sha256sum "/tmp/$asset" | cut -d' ' -f1)
+            old_sha=$(grep -A1 "url.*${asset}" Formula/task-manager.rb | \
+              tail -1 | sed 's/.*sha256 "\(.*\)".*/\1/')
+            sed -i "s/sha256 \"${old_sha}\"/sha256 \"${new_sha}\"/" Formula/task-manager.rb
+          done
+
+          git config user.name "Daniel Maricic"
+          git config user.email "woss@users.noreply.github.com"
+          git add Formula/task-manager.rb
+          git commit -m "task-manager ${VERSION}"
+          git push
